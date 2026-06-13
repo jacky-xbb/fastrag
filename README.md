@@ -23,11 +23,13 @@ npm install
 ```bash
 npm run ingest                      # 入库默认标的 GBT 18242-2025
 npm run ingest -- "pdf/xxx.pdf"     # 入库指定 PDF（需有文字层）
-npm run ask                         # 提默认指标问题（验证带来源作答）
+npm run ask                         # 默认跑两轮对话（演示多轮记忆）
 npm run ask -- "你的问题"
+npm run ask -- "第1问" "第2问"      # 多参数 = 同一会话里的多轮提问
 ```
 
-向量与历史落在本地 `vector.db`（libSQL，已 gitignore）。
+向量与会话历史落在同一个本地 `vector.db`（libSQL，已 gitignore）：
+Agent 接入 Mastra Memory（默认带最近 10 条消息），同一 thread 内多轮可互相引用。
 
 ## 反馈回路
 

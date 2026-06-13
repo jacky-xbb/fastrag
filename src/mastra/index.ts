@@ -3,11 +3,18 @@
 
 import { Mastra } from '@mastra/core'
 import { Agent } from '@mastra/core/agent'
-import { LibSQLVector } from '@mastra/libsql'
+import { LibSQLVector, LibSQLStore } from '@mastra/libsql'
+import { Memory } from '@mastra/memory'
 import { createVectorQueryTool } from '@mastra/rag'
 import { chatModel, embedModel, VECTOR_DB_URL, INDEX_NAME } from '../lib/openrouter.js'
 
 export const libsqlVector = new LibSQLVector({ id: 'libsql', url: VECTOR_DB_URL })
+
+// 会话历史与向量库共用同一个 libSQL 文件（#5）：两者表名不冲突，可共存。
+export const libsqlStore = new LibSQLStore({ id: 'libsql-store', url: VECTOR_DB_URL })
+
+// 多轮会话历史：默认带最近 10 条消息（semanticRecall 关闭，无需额外向量库）。
+export const memory = new Memory({ storage: libsqlStore })
 
 // 检索侧必须用与入库相同的 embedding 模型，向量空间才一致。
 export const vectorQueryTool = createVectorQueryTool({
@@ -29,9 +36,11 @@ export const standardsAgent = new Agent({
 - 用中文回答。`,
   model: chatModel,
   tools: { vectorQueryTool },
+  memory,
 })
 
 export const mastra = new Mastra({
   agents: { standardsAgent },
   vectors: { libsql: libsqlVector },
+  storage: libsqlStore,
 })
