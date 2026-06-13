@@ -21,3 +21,17 @@
 - `CONTEXT.md`：术语表，**只放领域名词，不放实现细节**。
 - `docs/adr/`：架构决策记录。改了选型先看/补 ADR。
 - `docs/调研文档.md`：一次性调研，别往里塞会绑定实现的硬决策（放这儿没人会读到）。
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`jacky-xbb/fastrag`), managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles, each mapped to its default label string. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
