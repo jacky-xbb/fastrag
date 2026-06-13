@@ -1,0 +1,28 @@
+{
+  "name": "fastrag",
+  "version": "0.1.0",
+  "description": "防水卷材国标问答知识库",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ingest": "tsx src/ingest.ts",
+    "ask": "tsx src/ask.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mastra/core": "1.42.0",
+    "@mastra/libsql": "1.13.0",
+    "@mastra/rag": "2.2.1",
+    "@openrouter/ai-sdk-provider": "2.9.1",
+    "ai": "6.0.204",
+    "dotenv": "^17.0.0",
+    "unpdf": "1.6.2",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
