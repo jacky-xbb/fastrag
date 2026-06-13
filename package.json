@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "ingest": "tsx src/ingest.ts",
+    "ocr": "tsx src/ocr.ts",
     "ask": "tsx src/ask.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

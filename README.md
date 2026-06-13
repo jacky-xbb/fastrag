@@ -14,6 +14,9 @@
 联网兜底（Issue #6）：Agent 挂 `webSearchTool`（Tavily），**库内优先**；仅当已入库标准里查不到时才联网，
 答案区分「来源：国标库」（文件名+页码）与「来源：联网」（网页链接）。需在 `.env` 配 `TAVILY_API_KEY`。
 
+扫描件 OCR（Issue #2）：扫描件 PDF 用 PaddleOCR-VL 托管 API 直接转 markdown（[ADR-0003](docs/adr/0003-ocr-paddleocr-vl.md)），
+指标表格保留为带 `rowspan/colspan` 的 HTML 表（合并单元格不丢），逐页带「文件名+页码」锚点。需在 `.env` 配 `PADDLE_API_KEY`。
+
 ## 准备
 
 ```bash
@@ -26,6 +29,8 @@ npm install
 ```bash
 npm run ingest                      # 入库默认标的 GBT 18242-2025
 npm run ingest -- "pdf/xxx.pdf"     # 入库指定 PDF（需有文字层）
+npm run ocr                         # OCR 默认扫描件 GBT 23457-2017 → ocr_out.md
+npm run ocr -- "pdf/xxx.pdf" out.md # 扫描件 PDF → markdown（PaddleOCR-VL）
 npm run ask                         # 默认跑两轮对话（演示多轮记忆）
 npm run ask -- "你的问题"
 npm run ask -- "第1问" "第2问"      # 多参数 = 同一会话里的多轮提问

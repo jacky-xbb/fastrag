@@ -35,3 +35,6 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# OCR 脚本输出
+ocr_out.md
