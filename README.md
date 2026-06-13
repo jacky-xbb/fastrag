@@ -11,6 +11,9 @@
 
 > 切块目前是定长字符切块（`src/lib/chunk.ts`），**尚未**实现指标行级切块 / 混合检索（[ADR-0004](docs/adr/0004-indicator-chunking-hybrid-retrieval.md)）——留待后续切片。
 
+联网兜底（Issue #6）：Agent 挂 `webSearchTool`（Tavily），**库内优先**；仅当已入库标准里查不到时才联网，
+答案区分「来源：国标库」（文件名+页码）与「来源：联网」（网页链接）。需在 `.env` 配 `TAVILY_API_KEY`。
+
 ## 准备
 
 ```bash
