@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rrfFuse, matchesFilter, formatHits } from '../src/lib/hybrid.js'
+import { rrfFuse, matchesFilter, sanitizeFilter, formatHits } from '../src/lib/hybrid.js'
 
 describe('rrfFuse', () => {
   it('两路都靠前的 id 融合后排第一', () => {
@@ -41,6 +41,31 @@ describe('matchesFilter', () => {
 
   it('空串/undefined 字段当作不过滤', () => {
     expect(matchesFilter(meta(), { 标准号: '', 指标名: undefined })).toBe(true)
+  })
+
+  it('标准号归一化匹配：紧凑写法对上库里空格写法', () => {
+    const m = meta({ 标准号: 'JC 684-1997' })
+    expect(matchesFilter(m, { 标准号: 'jc684' })).toBe(true) // 去空格大小写无关
+    expect(matchesFilter(m, { 标准号: 'JC684' })).toBe(true)
+    expect(matchesFilter(m, { 标准号: 'GB' })).toBe(false) // 不沾边仍排除
+  })
+})
+
+describe('sanitizeFilter', () => {
+  it('丢弃 状态=现行 等反向排除（硬约束⑥：不漏废止）', () => {
+    expect(sanitizeFilter({ 状态: '现行' })).toEqual({})
+    expect(sanitizeFilter({ 状态: '有效' })).toEqual({})
+  })
+
+  it('保留 状态=废止 作正向收窄', () => {
+    expect(sanitizeFilter({ 状态: '废止' })).toEqual({ 状态: '废止' })
+  })
+
+  it('其余字段原样保留', () => {
+    expect(sanitizeFilter({ 标准号: 'GB/T 23457', 页码: 7, 状态: '现行' })).toEqual({
+      标准号: 'GB/T 23457',
+      页码: 7,
+    })
   })
 })
 
