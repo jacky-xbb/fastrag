@@ -12,71 +12,24 @@
 // 全量重建前建议先删 vector.db（会一并清掉会话历史，见 #5）。
 
 import 'dotenv/config'
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readdir, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { basename, join } from 'node:path'
-import { embedMany } from 'ai'
-import { ocrPdfToPages } from './lib/ocr.js'
-import { chunkOcrPages, type IndicatorChunk } from './lib/indicator-chunk.js'
+import { join } from 'node:path'
 import { planIngest, summarizePlan } from './lib/ingest-plan.js'
-import type { PageText } from './lib/chunk.js'
-import { embedModel, EMBED_DIMENSION, INDEX_NAME } from './lib/openrouter.js'
-import { libsqlVector } from './mastra/index.js'
+import { INDEX_NAME } from './lib/openrouter.js'
+import {
+  OCR_CACHE_DIR,
+  ensureIndex,
+  chunkPdf,
+  upsertRecords,
+} from './lib/ingest-pipeline.js'
 
 const DEFAULT_PDF = 'pdf/GBT 18242-2025 弹性体塑性体改性沥青防水卷材.pdf'
 const PDF_DIR = 'pdf'
-const OCR_CACHE_DIR = 'ocr_cache'
-const EMBED_BATCH = 256
-
-/** OCR 结果缓存到 ocr_cache/<basename>.json：OCR ~30s/份且结果 URL 仅 7 天，缓存后重跑免费。 */
-async function cachedOcrPages(pdfPath: string): Promise<PageText[]> {
-  await mkdir(OCR_CACHE_DIR, { recursive: true })
-  const cachePath = join(OCR_CACHE_DIR, `${basename(pdfPath)}.json`)
-  if (existsSync(cachePath)) {
-    console.log(`[ingest] 命中 OCR 缓存 ${cachePath}`)
-    return JSON.parse(await readFile(cachePath, 'utf8')) as PageText[]
-  }
-  const pages = await ocrPdfToPages(pdfPath)
-  await writeFile(cachePath, JSON.stringify(pages))
-  console.log(`[ingest] OCR 结果已缓存到 ${cachePath}`)
-  return pages
-}
-
-/** 单份 PDF → 指标行块。走 PaddleOCR-VL（缓存命中则免费）。 */
-async function chunkOne(pdfPath: string): Promise<IndicatorChunk[]> {
-  const fileName = basename(pdfPath)
-  console.log(`[ingest] OCR 读取 ${pdfPath}`)
-  const pages = await cachedOcrPages(pdfPath)
-  const records = chunkOcrPages(pages, { fileName, size: 800, overlap: 100 })
-  const tableChunks = records.filter((r) => r.metadata.指标名).length
-  console.log(
-    `[ingest] ${fileName}：${pages.length} 页 → ${records.length} 块（含 ${tableChunks} 指标行）`,
-  )
-  return records
-}
-
-/**
- * 把一份标准的块算向量后 upsert（分批，避免单次 embed 输入过多）。
- * id 用 `${文件名}#${序号}` 稳定标识：同份标准重跑 --all 时按 id 覆盖、不重复入库，
- * 故失败份补跑后无须先删库（OCR 缓存 + id 幂等 = 真·增量续跑）。
- */
-async function upsertRecords(records: IndicatorChunk[]) {
-  for (let i = 0; i < records.length; i += EMBED_BATCH) {
-    const batch = records.slice(i, i + EMBED_BATCH)
-    const { embeddings } = await embedMany({ model: embedModel, values: batch.map((r) => r.text) })
-    // metadata 带上 text，检索时 Agent 才读得到原文并据此引用来源。
-    await libsqlVector.upsert({
-      indexName: INDEX_NAME,
-      vectors: embeddings,
-      metadata: batch.map((r) => ({ text: r.text, ...r.metadata })),
-      ids: batch.map((r, j) => `${r.metadata.fileName}#${i + j}`),
-    })
-  }
-}
 
 async function main() {
   const args = process.argv.slice(2)
-  await libsqlVector.createIndex({ indexName: INDEX_NAME, dimension: EMBED_DIMENSION })
+  await ensureIndex()
 
   if (args.includes('--all')) {
     const files = (await readdir(PDF_DIR)).filter((f) => /\.pdf$/i.test(f)).sort()
@@ -108,7 +61,7 @@ async function main() {
     // 已入库的份不回滚；补跑 --all 时 OCR 缓存命中 + id 幂等覆盖，不重复付费/不重复入库。
     for (const f of files) {
       try {
-        const records = await chunkOne(join(PDF_DIR, f))
+        const records = await chunkPdf(join(PDF_DIR, f))
         await upsertRecords(records)
         okCount++
         totalChunks += records.length
@@ -126,7 +79,7 @@ async function main() {
   }
 
   const pdfPath = args.find((a) => !a.startsWith('--')) ?? DEFAULT_PDF
-  const records = await chunkOne(pdfPath)
+  const records = await chunkPdf(pdfPath)
   await upsertRecords(records)
   console.log(`[ingest] 完成：${records.length} 块已入库到索引 "${INDEX_NAME}"`)
 }

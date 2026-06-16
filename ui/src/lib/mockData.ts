@@ -1,7 +1,5 @@
 // 示例数据 —— 仅剩首屏建议词与上传管线阶段文案。
-// 对话走真实 /api/chat；资料库列表已接真（GET /api/library，见 useLibrary）；
-// 历史会话已接真（GET /api/threads + /api/messages，见 useThreads，#12）。
-// TODO(接后端)：上传向量化 useIngestSim → POST /api/ingest（#10）。
+// 对话 /api/chat、资料库 /api/library、历史 /api/threads、上传入库 /api/ingest（见 useIngest，#10）均已接真。
 
 export const SUGGESTIONS = [
   'GBT 18242-2025 中 I 型卷材的可溶物含量要求是多少？',

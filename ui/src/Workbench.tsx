@@ -1,6 +1,6 @@
 // 国标问答工作台 —— 专业暗色 · 三栏（IDE 式）。
 // 设计语言：深底、高密度、等宽数字、证据前置。三屏：登录(split) → 导入(库+日志) → 三栏对话(含证据面板)。
-// 对话走真实 /api/chat；上传向量化、历史列表暂为示例数据（见 mockData.ts 的 TODO：待后端补 /api/ingest、/api/threads）。
+// 对话 /api/chat、上传入库 /api/ingest、资料库 /api/library、历史 /api/threads 均已接真。
 import { useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
@@ -16,7 +16,7 @@ import {
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Loader } from '@/components/ai-elements/loader'
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion'
-import { useIngestSim } from './lib/useIngestSim'
+import { useIngest } from './lib/useIngest'
 import { useLibrary } from './lib/useLibrary'
 import { useThreads } from './lib/useThreads'
 import { SUGGESTIONS, INGEST_STAGES } from './lib/mockData'
@@ -96,8 +96,8 @@ function Landing({ onLogin }: { onLogin: () => void }) {
 }
 
 function Upload() {
-  const { job, start, clear } = useIngestSim()
-  const { entries, error } = useLibrary()
+  const { entries, error, refresh } = useLibrary()
+  const { job, start, clear } = useIngest(refresh) // 入库完成后刷新资料库列表
   return (
     <div className="flex flex-1 overflow-hidden">
       <section className="w-72 flex-none overflow-y-auto border-r border-zinc-800 p-3">
@@ -127,7 +127,7 @@ function Upload() {
           <span className="text-2xl">⬆</span>
           <span className="text-sm text-zinc-300">拖拽 PDF 或点击选择</span>
           <span className="font-mono text-xs text-zinc-600">pdf/*.pdf → OCR → chunk → embed → upsert</span>
-          <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && start(e.target.files[0].name)} />
+          <input type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) start(f); e.target.value = '' }} />
         </label>
 
         {job && (
@@ -152,7 +152,8 @@ function Upload() {
                   </div>
                 )
               })}
-              {job.done && <div className="mt-2 text-emerald-400">✓ done — upserted {job.chunks} chunks / {job.pages} pages（模拟进度）</div>}
+              {job.done && <div className="mt-2 text-emerald-400">✓ done — upserted {job.chunks} chunks / {job.pages} pages</div>}
+              {job.error && <div className="mt-2 text-red-400">✗ 入库失败：{job.error}</div>}
             </div>
           </div>
         )}

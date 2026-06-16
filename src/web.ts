@@ -9,7 +9,7 @@
 
 import 'dotenv/config'
 import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, extname, normalize } from 'node:path'
 import { createUIMessageStream, pipeUIMessageStreamToResponse } from 'ai'
@@ -18,6 +18,8 @@ import { mastra, memory, GENERATE_MAX_STEPS } from './mastra/index.js'
 import { loadCorpusFresh } from './lib/corpus.js'
 import { aggregateLibrary } from './lib/library.js'
 import { firstUserText, deriveThreadTitle } from './lib/threads.js'
+import { safePdfName } from './lib/ingest-upload.js'
+import { ensureIndex, cachedOcrPages, chunkPages, upsertRecords } from './lib/ingest-pipeline.js'
 
 const PORT = Number(process.env.PORT) || 4111
 const RESOURCE_ID = 'web-user'
@@ -66,6 +68,16 @@ function readBody(req: import('node:http').IncomingMessage): Promise<string> {
     let data = ''
     req.on('data', (c) => (data += c))
     req.on('end', () => resolve(data))
+    req.on('error', reject)
+  })
+}
+
+// 上传的 PDF 是二进制，按 Buffer 收集（按字符串拼会损坏字节）。
+function readBodyBuffer(req: import('node:http').IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (c) => chunks.push(c as Buffer))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
 }
@@ -174,6 +186,57 @@ const server = createServer(async (req, res) => {
       } else {
         res.end()
       }
+    }
+    return
+  }
+
+  // PDF 上传入库（#10）：原始 PDF 字节为请求体，文件名走 ?name=。
+  // 复用入库管线（OCR→指标行切块→embed→upsert，ADR-0003/0004），按 NDJSON 逐阶段推真实进度：
+  //   {type:'stage', stage:'upload'|'ocr'|'chunk'|'embed'|'upsert'} … {type:'done', pages, chunks} | {type:'error', message}
+  // 上传的 PDF 落到 pdf/（与语料源同处，OCR 缓存按 basename，重复上传命中缓存 + id 幂等覆盖、不重复块）。
+  if (req.method === 'POST' && (req.url || '').split('?')[0] === '/api/ingest') {
+    const t0 = Date.now()
+    let fileName = ''
+    res.writeHead(200, {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      'cache-control': 'no-cache',
+    })
+    const send = (ev: Record<string, unknown>) => res.write(JSON.stringify(ev) + '\n')
+    try {
+      const rawName = new URL(req.url || '', 'http://localhost').searchParams.get('name') || ''
+      fileName = safePdfName(rawName)
+      const buf = await readBodyBuffer(req)
+      if (buf.length === 0) throw new Error('上传内容为空')
+
+      send({ type: 'stage', stage: 'upload' })
+      const pdfPath = join(process.cwd(), 'pdf', fileName)
+      await writeFile(pdfPath, buf)
+      await ensureIndex()
+
+      send({ type: 'stage', stage: 'ocr' })
+      const pages = await cachedOcrPages(pdfPath)
+
+      send({ type: 'stage', stage: 'chunk' })
+      const records = chunkPages(pages, fileName)
+
+      let lastStage = ''
+      await upsertRecords(records, (stage) => {
+        if (stage !== lastStage) {
+          lastStage = stage
+          send({ type: 'stage', stage })
+        }
+      })
+
+      send({ type: 'done', pages: pages.length, chunks: records.length })
+      console.log(
+        `[ingest] ${Date.now() - t0}ms ${fileName}：${pages.length} 页 / ${records.length} 块入库`,
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[ingest] ${Date.now() - t0}ms 出错 file=${JSON.stringify(fileName)}:`, err)
+      send({ type: 'error', message: msg })
+    } finally {
+      res.end()
     }
     return
   }
