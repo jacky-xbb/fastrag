@@ -20,6 +20,11 @@ export function loadCorpus(): Promise<CorpusChunk[]> {
   return cache
 }
 
+/** 不走缓存，直读最新库（供资料库列表 /api/library 用：入库后无须重启即反映新标准）。 */
+export function loadCorpusFresh(): Promise<CorpusChunk[]> {
+  return fetchCorpus()
+}
+
 async function fetchCorpus(): Promise<CorpusChunk[]> {
   const client = createClient({ url: VECTOR_DB_URL })
   const res = await client.execute(`SELECT vector_id, metadata FROM ${INDEX_NAME}`)

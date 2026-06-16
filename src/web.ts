@@ -14,6 +14,8 @@ import { existsSync } from 'node:fs'
 import { join, extname, normalize } from 'node:path'
 import { createUIMessageStream, pipeUIMessageStreamToResponse } from 'ai'
 import { mastra, GENERATE_MAX_STEPS } from './mastra/index.js'
+import { loadCorpusFresh } from './lib/corpus.js'
+import { aggregateLibrary } from './lib/library.js'
 
 const PORT = Number(process.env.PORT) || 4111
 const RESOURCE_ID = 'web-user'
@@ -161,6 +163,21 @@ const server = createServer(async (req, res) => {
       } else {
         res.end()
       }
+    }
+    return
+  }
+
+  // 资料库列表（#11）：直读 libSQL，按标准号聚合（一行一标准，含页数/块数/状态）。
+  if (req.method === 'GET' && (req.url || '').split('?')[0] === '/api/library') {
+    try {
+      const corpus = await loadCorpusFresh()
+      const library = aggregateLibrary(corpus)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify(library))
+    } catch (err) {
+      console.error('[library] 出错:', err)
+      res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
     }
     return
   }

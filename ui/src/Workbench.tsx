@@ -17,7 +17,8 @@ import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '@/componen
 import { Loader } from '@/components/ai-elements/loader'
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion'
 import { useIngestSim } from './lib/useIngestSim'
-import { MOCK_LIBRARY, MOCK_SESSIONS, SUGGESTIONS, INGEST_STAGES } from './lib/mockData'
+import { useLibrary } from './lib/useLibrary'
+import { MOCK_SESSIONS, SUGGESTIONS, INGEST_STAGES } from './lib/mockData'
 
 export function Workbench() {
   const [authed, setAuthed] = useState(false)
@@ -95,12 +96,20 @@ function Landing({ onLogin }: { onLogin: () => void }) {
 
 function Upload() {
   const { job, start, clear } = useIngestSim()
+  const { entries, error } = useLibrary()
   return (
     <div className="flex flex-1 overflow-hidden">
       <section className="w-72 flex-none overflow-y-auto border-r border-zinc-800 p-3">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">已入库 <span className="normal-case text-zinc-600">（示例数据）</span></div>
-        {MOCK_LIBRARY.map((d) => (
-          <div key={d.id} className="mb-1 rounded-md border border-zinc-800 bg-zinc-900 p-2.5 text-sm">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          已入库 {entries && <span className="normal-case text-zinc-600">（{entries.length}）</span>}
+        </div>
+        {error && <div className="mb-1 rounded-md border border-red-900/60 bg-red-950/40 p-2.5 text-xs text-red-400">加载失败：{error}</div>}
+        {!entries && !error && <div className="text-xs text-zinc-600">加载中…</div>}
+        {entries && entries.length === 0 && (
+          <div className="rounded-md border border-dashed border-zinc-800 p-3 text-xs text-zinc-600">库内暂无标准，右侧上传 PDF 入库。</div>
+        )}
+        {entries?.map((d) => (
+          <div key={d.code} className="mb-1 rounded-md border border-zinc-800 bg-zinc-900 p-2.5 text-sm">
             <div className="truncate font-medium text-zinc-200">{d.code}</div>
             <div className="truncate text-xs text-zinc-500">{d.name}</div>
             <div className="mt-1 flex items-center gap-2 font-mono text-[11px] text-zinc-600">
