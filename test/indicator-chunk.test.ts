@@ -112,6 +112,85 @@ describe('chunkOcrPages（指标行切块）', () => {
   })
 })
 
+// 真实样本：GB/T 18242-2025 表2 SBS 防水卷材基本性能。
+// 值列表头是两级型号：指标 →（I / II）→（PY / G / PY），
+// I 型有 PY/G 两列、II 型有 PY 一列。两个「PY」列值不同，必须靠 I/II 区分。
+const table3 =
+  `<table border=1>` +
+  `<tr><td rowspan="3">序号</td><td rowspan="3" colspan="2">项目</td><td colspan="3">指标</td></tr>` +
+  `<tr><td colspan="2">I</td><td>II</td></tr>` +
+  `<tr><td>PY</td><td>G</td><td>PY</td></tr>` +
+  `<tr><td rowspan="3">5</td><td rowspan="3">拉伸性能</td><td>最大拉力/(N/50 mm) \\ge</td><td>500</td><td>350</td><td>800</td></tr>` +
+  `<tr><td>最大拉力时延伸率 \\ge</td><td>30 %</td><td>—</td><td>40 %</td></tr>` +
+  `<tr><td>试验现象</td><td colspan="3">拉伸过程中,试件中部无沥青涂盖层开裂</td></tr>` +
+  `</table>`
+
+describe('chunkOcrPages（多级型号表头：型号层不丢，两个 PY 列不打架）', () => {
+  let records: Awaited<ReturnType<typeof chunkOcrPages>>
+  beforeAll(async () => {
+    records = await chunkOcrPages(
+      [{ page: 3, text: `<div>表2 SBS防水卷材基本性能</div>${table3}` }],
+      { fileName: 'GBT 18242-2025 弹性体改性沥青防水卷材.pdf', 标准号: 'GB/T 18242-2025', size: 800, overlap: 100 },
+    )
+  })
+
+  it('最大拉力：每个值带上「型号+物理层」列头（I PY / I G / II PY），II 型 800 不被 I 型 500 的 PY 吞掉', () => {
+    const 拉力 = records.find((r) => r.metadata.指标名.includes('最大拉力/'))!
+    expect(拉力.text).toContain('I PY=500')
+    expect(拉力.text).toContain('I G=350')
+    expect(拉力.text).toContain('II PY=800')
+  })
+
+  it('延伸率：I 型 30%、II 型 40% 靠型号区分，— 不入块', () => {
+    const 延伸率 = records.find((r) => r.metadata.指标名.includes('延伸率'))!
+    expect(延伸率.text).toContain('I PY=30 %')
+    expect(延伸率.text).toContain('II PY=40 %')
+    expect(延伸率.text).not.toContain('I G=') // — 跳过，不留空标签
+  })
+})
+
+// 真实样本：GB/T 18242-2025 表5 试件尺寸和数量（截自 vl_gbt18242.md）。
+// 无「指标」表头，列 = 序号 | 试验项目(colspan2) | 试件尺寸 | 数量；
+// 「试件尺寸」「数量」都是值列，旧逻辑只把最后一列当值、试件尺寸被并进指标名。
+const table5 =
+  `<table border=1>` +
+  `<tr><td>序号</td><td colspan="2">试验项目</td><td>试件尺寸(纵向×横向)mm</td><td>数量</td></tr>` +
+  `<tr><td>1</td><td colspan="2">可溶物含量</td><td>100×100</td><td>3</td></tr>` +
+  `<tr><td rowspan="3">7</td><td rowspan="3">热老化</td><td>拉伸性能</td><td>(250～320)×50</td><td>纵横向各 5</td></tr>` +
+  `<tr><td>质量损失</td><td>(250～320)×50</td><td>纵向 5</td></tr>` +
+  `<tr><td>低温柔性</td><td>150×25</td><td>纵向 10</td></tr>` +
+  `</table>`
+
+describe('chunkOcrPages（无「指标」表头：试件尺寸/数量都当值列，不并进指标名）', () => {
+  let records: Awaited<ReturnType<typeof chunkOcrPages>>
+  beforeAll(async () => {
+    records = await chunkOcrPages(
+      // 标题带「（续）」：验证续表表名归一到正表
+      [{ page: 6, text: `<div>表5 试件尺寸和数量（续）</div>${table5}` }],
+      { fileName: 'GBT 18242-2025 弹性体改性沥青防水卷材.pdf', 标准号: 'GB/T 18242-2025', size: 800, overlap: 100 },
+    )
+  })
+
+  it('可溶物含量：指标名只含项目名，试件尺寸与数量分别带列头当值', () => {
+    const r = records.find((r) => r.metadata.指标名.includes('可溶物含量'))!
+    expect(r.metadata.指标名).toBe('可溶物含量') // 不再把 100×100 并进指标名
+    expect(r.text).toContain('试件尺寸')
+    expect(r.text).toContain('=100×100')
+    expect(r.text).toContain('数量=3')
+  })
+
+  it('嵌套行（热老化）：子项留在指标名，尺寸/数量仍当值', () => {
+    const r = records.find((r) => r.metadata.指标名.includes('热老化') && r.metadata.指标名.includes('拉伸性能'))!
+    expect(r.metadata.指标名).toBe('热老化 拉伸性能') // 子项进指标名，尺寸不并入
+    expect(r.text).toContain('=(250～320)×50')
+    expect(r.text).toContain('数量=纵横向各 5')
+  })
+
+  it('续表表名归一：「（续）」剥掉，与正表同名', () => {
+    expect(records[0].metadata.表名).toBe('表5 试件尺寸和数量')
+  })
+})
+
 describe('standardCodeFromFileName', () => {
   it.each([
     ['GBT 18242-2025 弹性体塑性体改性沥青防水卷材.pdf', 'GB/T 18242-2025'],
