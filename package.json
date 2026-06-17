@@ -14,7 +14,7 @@
     "ui:build": "vite build --config ui/vite.config.ts",
     "dev": "concurrently -k -n api,ui -c blue,magenta \"npm:dev:api\" \"npm:ui\"",
     "dev:local": "concurrently -k -n db,api,ui -c green,blue,magenta \"npm:dev:db\" \"npm:dev:api:local\" \"npm:ui\"",
-    "deploy": "npm run ui:build && wrangler deploy",
+    "deploy": "wrangler types && npm run typecheck && npm run test && npm run ui:build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

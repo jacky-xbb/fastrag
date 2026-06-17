@@ -68,7 +68,7 @@ export function ChatPage() {
     }),
   )
   const { refresh: refreshThreads } = useThreadsContext()
-  const { messages, status, sendMessage, setMessages } = useChat({
+  const { messages, status, sendMessage, setMessages, stop } = useChat({
     transport: transport.current,
     onFinish: () => refreshThreads(),
   })
@@ -115,6 +115,10 @@ export function ChatPage() {
   const lastTools = lastAssistant ? toolPartsOf(lastAssistant) : []
   const sources = parseSources(lastTools)
 
+  // submitted（已发未答）或 streaming 但正文尚未吐字（仍在检索/工具阶段）都显示 Loader，
+  // 否则工具 Completed 到首字之间正文区一片空白，看着像模型卡死没响应。
+  const showLoader = status === 'submitted' || (status === 'streaming' && !(lastAssistant ? textOf(lastAssistant) : '').trim())
+
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* 中：对话 */}
@@ -128,7 +132,7 @@ export function ChatPage() {
                 </MessageContent>
               </Message>
             ))}
-            {status === 'submitted' && <Loader />}
+            {showLoader && <Loader />}
           </ConversationContent>
         </Conversation>
         <div className="p-3">
@@ -141,10 +145,20 @@ export function ChatPage() {
           )}
           <PromptInput onSubmit={(msg) => send(msg.text ?? '')}>
             <PromptInputBody>
-              <PromptInputTextarea placeholder="检索国标…（Enter 发送）" />
+              <PromptInputTextarea placeholder="输入问题，回车发送" />
             </PromptInputBody>
             <PromptInputFooter>
-              <PromptInputSubmit status={status} className="ml-auto" />
+              <PromptInputSubmit
+                status={status}
+                className="ml-auto"
+                onClick={(e) => {
+                  // 回答中（submitted=检索/思考、streaming=吐字）点按钮 = 中断，而非再次提交。
+                  if (status === 'submitted' || status === 'streaming') {
+                    e.preventDefault()
+                    stop()
+                  }
+                }}
+              />
             </PromptInputFooter>
           </PromptInput>
         </div>
