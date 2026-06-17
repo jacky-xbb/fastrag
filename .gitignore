@@ -35,6 +35,7 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # OCR 脚本输出 + 入库 OCR 结果缓存（体积大、可重生）
 ocr_out.md
