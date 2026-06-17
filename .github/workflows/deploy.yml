@@ -13,19 +13,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       # 生成 worker-configuration.d.ts（离线、免鉴权），供 typecheck 用。
-      - run: npx wrangler types
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run ui:build
+      - run: pnpm exec wrangler types
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run ui:build
       - name: Deploy to Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
           command: deploy
