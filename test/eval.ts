@@ -16,6 +16,7 @@
 //   npx tsx test/eval.ts --llm       # 额外端到端跑 Agent，测 P2 来源标注（耗对话 token）
 //   npx tsx test/eval.ts --k 10      # 改 Recall@K 的 K（默认 6，与线上 topK 一致）
 //   npx tsx test/eval.ts --prose     # 换正文评测集（试验步骤/范围/术语），判分=关键词文本命中
+//   npx tsx test/eval.ts --newdocs   # 换「新增文档」评测集（可叠加 --prose），验证新入库标准的召回
 
 import 'dotenv/config'
 import { readFileSync } from 'node:fs'
@@ -41,11 +42,14 @@ const useLlm = process.argv.includes('--llm')
 const filtered = process.argv.includes('--filtered')
 // --prose：换正文评测集，判分改「关键词文本命中」而非「指标名元数据匹配」。
 const prose = process.argv.includes('--prose')
-const datasetFile = prose ? 'eval-prose-dataset.jsonl' : 'eval-dataset.jsonl'
+// --newdocs：换「新增文档」评测集（验证新入库标准的召回），与 --prose 正交。
+const newdocs = process.argv.includes('--newdocs')
+const datasetBase = newdocs ? 'eval-newdocs' : 'eval'
+const datasetFile = prose ? `${datasetBase}-prose-dataset.jsonl` : `${datasetBase}-dataset.jsonl`
 const kArg = process.argv.indexOf('--k')
 const K = kArg >= 0 ? Number(process.argv[kArg + 1]) : 6
 
-const cases: EvalCase[] = readFileSync(join(here, datasetFile), 'utf8')
+const cases: EvalCase[] = readFileSync(join(here, 'datasets', datasetFile), 'utf8')
   .split('\n')
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l) as EvalCase)
@@ -81,8 +85,9 @@ async function main() {
 
   const mode = filtered ? '带标准号过滤' : '裸召回'
   const kind = prose ? '正文召回' : '指标召回'
+  const corpus = newdocs ? '新增文档·' : ''
   console.log(
-    `\n=== 检索评测(${kind}) · Recall@${K} · ${mode}${useLlm ? ' + 来源标注' : ''} · 共 ${cases.length} 题 ===\n`,
+    `\n=== 检索评测(${corpus}${kind}) · Recall@${K} · ${mode}${useLlm ? ' + 来源标注' : ''} · 共 ${cases.length} 题 ===\n`,
   )
 
   for (const [i, c] of cases.entries()) {
