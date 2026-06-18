@@ -23,6 +23,7 @@
     "@mastra/memory": "^1.20.3",
     "@mastra/rag": "2.2.1",
     "@openrouter/ai-sdk-provider": "2.9.1",
+    "@radix-ui/react-alert-dialog": "^1.1.17",
     "ai": "6.0.204",
     "dotenv": "^17.0.0",
     "tsx": "^4.22.4",

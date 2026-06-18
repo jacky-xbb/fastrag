@@ -25,6 +25,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Logo } from './Logo'
 import { useAuth } from '../lib/useAuth'
 import { useThreadsContext } from '../lib/threadsContext'
@@ -50,6 +62,7 @@ export function AppSidebar() {
   const mode = location.pathname.startsWith('/upload') ? 'upload' : 'chat'
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const activeId = param ?? null
   // 记住最近的检索台会话：切到「入库」时不更新（保留），点「检索台」可回到该会话而非开新会话。
   // chat 模式下新会话空白态（无 param）记 null，保证「新会话」后切走再回来不被带回旧会话。
@@ -75,7 +88,7 @@ export function AppSidebar() {
   }
 
   async function deleteThread(id: string) {
-    if (!window.confirm('确定删除这个会话？删除后无法恢复。')) return
+    setPendingDelete(null)
     try {
       await remove(id)
       if (id === activeId) navigate('/chat') // 删的是当前会话 → 回到新会话空白态
@@ -218,7 +231,7 @@ export function AppSidebar() {
                         showOnHover
                         className="top-2.5 hover:text-red-400"
                         aria-label="删除会话"
-                        onClick={() => deleteThread(s.id)}
+                        onClick={() => setPendingDelete(s.id)}
                       >
                         <Trash2 />
                       </SidebarMenuAction>
@@ -274,6 +287,24 @@ export function AppSidebar() {
       </SidebarFooter>
 
       <SidebarRail />
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确定删除这个会话？</AlertDialogTitle>
+            <AlertDialogDescription>删除后无法恢复。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: 'destructive' }))}
+              onClick={() => pendingDelete && deleteThread(pendingDelete)}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   )
 }
