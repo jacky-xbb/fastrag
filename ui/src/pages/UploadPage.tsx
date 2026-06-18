@@ -61,7 +61,7 @@ export function UploadPage() {
             {jobs.map((job) => (
               <div key={job.id} className="rounded-lg border border-zinc-800 bg-zinc-900 font-mono text-sm">
                 <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2 text-zinc-300">
-                  <span className="truncate">$ ingest "{job.fileName}"</span>
+                  <span className="truncate">📄 {job.fileName}</span>
                   {job.queued && <span className="ml-2 flex-none text-xs text-zinc-500">排队中…</span>}
                 </div>
                 {job.queued ? (
