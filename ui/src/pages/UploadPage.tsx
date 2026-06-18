@@ -35,7 +35,7 @@ export function UploadPage() {
   return (
     <div className="flex flex-1 overflow-hidden">
       <section className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto p-6">
-        <h2 className="text-lg font-semibold text-zinc-100">入库新标准</h2>
+        <h1 className="text-lg font-semibold text-zinc-100">入库新标准</h1>
         <label
           onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true) }}
           onDragLeave={(e) => { e.preventDefault(); setDragging(false) }}

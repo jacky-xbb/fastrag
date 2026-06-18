@@ -125,8 +125,9 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      {/* 中：对话 */}
-      <main className="flex flex-1 flex-col overflow-hidden">
+      {/* 中：对话。外层 SidebarInset 已是 <main>，这里用 <div> 避免 main 套 main。 */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <h1 className="sr-only">检索台</h1>
         <Conversation className="flex-1">
           <ConversationContent>
             {messages.map((m) => (
@@ -166,7 +167,7 @@ export function ChatPage() {
             </PromptInputFooter>
           </PromptInput>
         </div>
-      </main>
+      </div>
 
       {/* 右：证据面板。小屏隐藏（会挤瘪聊天区），≥lg 才显示；来源信息答案正文里也有。 */}
       <aside className="hidden w-80 flex-none overflow-y-auto border-l border-zinc-800 bg-zinc-900/40 p-4 text-sm lg:block">

@@ -50,3 +50,6 @@ ingest_status/
 
 # Ralph 自主开发循环（开发工具，项目无关，可 `setup ralph` 一键重建）
 ralph/
+
+# ui-test skill artifacts
+.context/

@@ -41,8 +41,9 @@ export function LoginPage() {
         <form onSubmit={submit} className="w-full max-w-sm space-y-4">
           <h2 className="text-xl font-semibold text-zinc-100">登录</h2>
           <div>
-            <label className="text-xs text-zinc-500">账号</label>
+            <label htmlFor="login-user" className="text-xs text-zinc-500">账号</label>
             <input
+              id="login-user"
               value={u}
               onChange={(e) => setU(e.target.value)}
               autoComplete="username"
@@ -50,8 +51,9 @@ export function LoginPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">密码</label>
+            <label htmlFor="login-password" className="text-xs text-zinc-500">密码</label>
             <input
+              id="login-password"
               type="password"
               value={p}
               onChange={(e) => setP(e.target.value)}
