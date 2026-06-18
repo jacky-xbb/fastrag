@@ -1,7 +1,7 @@
 // 检索台（三栏）：左历史会话、中对话（ai-elements）、右证据面板。
 // 当前会话由 URL 决定：/chat = 新会话；/chat/:threadId = 该会话（深链/刷新保留，ADR-0007）。
 import { useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { Conversation, ConversationContent } from '@/components/ai-elements/conversation'
@@ -56,6 +56,7 @@ function parseSources(parts: AnyPart[]): Source[] {
 export function ChatPage() {
   const { threadId: param } = useParams()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const idRef = useRef(newThreadId()) // 当前会话 id（/chat 新会话用；深链时由下方 effect 切到 param）
   const loadedRef = useRef<string | null>(null) // 已拉过历史的 threadId（StrictMode 双跑 / 覆盖守卫）
   const transport = useRef(
@@ -78,6 +79,9 @@ export function ChatPage() {
   //   守卫用 loadedRef（成功后才记），不拿 idRef 自卡：否则 StrictMode 双跑时第一次的 fetch 被清理取消、第二次又被守卫挡掉，历史拉不进来。
   // - 无 param（新会话，侧栏点「新会话」或删当前会话后）→ 起新 id、清空对话。
   useEffect(() => {
+    // ChatPage 常驻：切到「入库」(/upload) 时 param 会变空，但此时不该重置会话——
+    // 否则正在生成的对话被清空、stream 中断。只在 chat 路由响应 param 变化。
+    if (!pathname.startsWith('/chat')) return
     if (!param) {
       idRef.current = newThreadId()
       loadedRef.current = null
@@ -98,7 +102,7 @@ export function ChatPage() {
     return () => {
       alive = false
     }
-  }, [param, setMessages])
+  }, [param, pathname, setMessages])
 
   function send(text: string) {
     if (!text.trim()) return
