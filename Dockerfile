@@ -20,8 +20,10 @@ RUN pnpm install --frozen-lockfile --prod
 COPY tsconfig.json ./
 COPY src ./src
 COPY --from=builder /app/ui/dist ./ui/dist
-# 瘦库种子：首启由 entrypoint 拷到 /data（volume 持久，重部署不覆盖）。
-COPY vector.db ./seed/vector.db
+# 瘦库种子（可选）：本地有 vector.db 就烤进 /app/seed，首启由 entrypoint 拷到 /data
+# （volume 持久，重部署不覆盖）。CI 检出无 vector.db 时只拷 .gitkeep、跳过种子，纯代码
+# 部署（生产卷已有数据）。glob + 保证存在的 .gitkeep 让缺库时 COPY 不报错。
+COPY seed/.gitkeep vector.db* ./seed/
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 EXPOSE 8080
