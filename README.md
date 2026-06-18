@@ -26,10 +26,6 @@ flowchart LR
 - **建库**：上传国标 PDF → 自动识别文字和表格 → 切成带标号、页码的小段，存进知识库。
 - **作答**：用户提问 → 先在知识库里检索 → AI 用库里原文作答并标来源；库里查不到时联网搜索兜底，结果标注「来源：联网」。
 
-## 知识库内容
-
-当前知识库收录 21 篇防水卷材类国标/行标，涵盖建筑通用规范、GB/T 328 系列试验方法、铁路 / 水运 / 公路行业专用标准，以及历史（已废止）标准。其中 GB 23441-2009（自粘聚合物改性沥青防水卷材）、GB 45320-2025（建筑防水卷材安全和通用技术规范）等为近期新增入库。完整清单登录后在「入库」侧栏可见；下方示例问法均能真打中库内对应标准。
-
 ## 示例问法
 
 不知道问什么，直接抄下面这些试。可以带标准号问得更准，也可以**用产品名或大白话问**（无需记标准号）。
@@ -85,9 +81,12 @@ flowchart LR
 需要 Node 22 + pnpm。
 
 ```bash
-cp .env.example .env       # 按下表填值
+cp .env.example .env   # 填下表的 key
 pnpm install
+pnpm dev               # API + vite 热更新 → http://localhost:5173
 ```
+
+打开 `http://localhost:5173`，用 `ADMIN_USER` / `ADMIN_PASSWORD` 登录，入库 PDF、检索问答都在页面上操作。
 
 `.env` 关键 key（全大写）：
 
@@ -97,21 +96,24 @@ pnpm install
 | `PADDLE_API_KEY` | OCR |
 | `TAVILY_API_KEY` | 联网兜底 |
 | `ADMIN_USER` / `ADMIN_PASSWORD` / `SESSION_SECRET` | 单管理员鉴权（`SESSION_SECRET` 用 `openssl rand -hex 32`） |
-| `VECTOR_DB_URL` | 可选，libSQL 库地址；不设则默认本地 `file:./vector.db` |
-
-跑起来：
-
-```bash
-pnpm ui:build      # 构建前端到 ui/dist
-pnpm start         # 起常驻服务 → http://localhost:8080（PORT= 可改）
-```
-
-浏览器打开 `http://localhost:8080`，用 `ADMIN_USER` / `ADMIN_PASSWORD` 登录，**入库 PDF、检索问答都在页面上操作**，无需命令行。
-
-> 开发模式用 `pnpm dev`（API + vite 热更新）。向量与会话历史落在同一个本地 `vector.db`（已 gitignore），OCR 结果缓存在 `ocr_cache/`，重传不会重复付费 OCR。
 
 线上部署在 fly.io（常驻 Node + 本地卷 libSQL），见 [ADR-0010](docs/adr/0010-deploy-fly-local-volume.md) 与 [docs/部署-fly.md](docs/部署-fly.md)。
 
+## 评测
+
+检索召回 + 来源标注的离线评测（读真实库，不走 vitest）：`npx tsx test/eval.ts`。
+
+- **P0 召回率 Recall@K**（纯检索、不经 LLM）：默认裸召回量底线；`--filtered` 用标准号过滤量产线上界。
+- **P2 来源正确**：`--llm` 端到端跑 Agent，校验答案引用的标准号对不对。
+- 数据集在 `test/datasets/`：指标集（`eval-dataset`）+ 正文集（`--prose`）；`--newdocs` 切到「新增文档」评测集，专门验证新入库标准的召回。
+
+```bash
+npx tsx test/eval.ts            # 裸召回 P0（快、便宜）
+npx tsx test/eval.ts --filtered # 带标准号过滤的 P0（产线路径）
+npx tsx test/eval.ts --llm      # 端到端 P2 来源标注（耗对话 token）
+npx tsx test/eval.ts --newdocs  # 新增文档评测集（可叠加 --prose）
+```
+
 ## GitHub Actions 自动化
 
-代码推到 `main` 分支后，`.github/workflows/deploy.yml` 会自动跑测试并部署到 fly.io，无需手动操作。只需在仓库 Settings → Secrets 配一个 `FLY_API_TOKEN`。
+代码推到 `main` 分支后，`.github/workflows/deploy.yml` 会自动跑测试并部署到 fly.io，无需手动操作。
