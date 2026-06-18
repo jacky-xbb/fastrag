@@ -45,5 +45,8 @@ venv/
 ocr_out.md
 ocr_cache/
 
+# 入库进度 JSON（Node 入口 fsBucket 运行时生成，可重生）
+ingest_status/
+
 # Ralph 自主开发循环（开发工具，项目无关，可 `setup ralph` 一键重建）
 ralph/

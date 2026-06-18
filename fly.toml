@@ -22,7 +22,7 @@ primary_region = "sin"
   source = "fastrag_data"
   destination = "/data"
 
-# 让 ~19M 库常驻 page cache；入库时 OCR/embed 也够用。
+# 让库常驻 page cache；入库时单文件最大 100MB 进内存 + OCR/embed，2G 留足余量。
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1024mb"
+  memory = "2048mb"

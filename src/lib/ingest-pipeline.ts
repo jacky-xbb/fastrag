@@ -67,14 +67,28 @@ export async function chunkPages(pages: PageText[], fileName: string): Promise<I
   return records
 }
 
+/** 删掉某份 PDF 的全部旧块（vector_id 前缀 `${fileName}#`）。
+ *  用前缀精确比对而非 LIKE，免去文件名里 _/% 被当通配符的坑。 */
+async function deleteFileChunks(fileName: string) {
+  const client = createClient({ url: VECTOR_DB_URL, authToken: VECTOR_DB_AUTH_TOKEN })
+  const prefix = `${fileName}#`
+  await client.execute({
+    sql: `DELETE FROM ${INDEX_NAME} WHERE substr(vector_id, 1, ?) = ?`,
+    args: [prefix.length, prefix],
+  })
+}
+
 /**
  * 把一份标准的块算向量后 upsert（分批，避免单次 embed 输入过多）。
- * id 幂等覆盖：同份标准重跑无须先删库。onStage 在每批 embed/upsert 前回调（供 web 推真实进度）。
+ * 先按文件名前缀清掉旧块再写新块：同份标准重灌是一次干净替换，
+ * 即使新版块数变少也不留孤儿块（id 幂等覆盖只覆盖同 id，删不掉多出来的旧块）。
+ * onStage 在每批 embed/upsert 前回调（供 web 推真实进度）。
  */
 export async function upsertRecords(
   records: IndicatorChunk[],
   onStage?: (stage: 'embed' | 'upsert') => void,
 ) {
+  if (records.length) await deleteFileChunks(records[0].metadata.fileName)
   for (let i = 0; i < records.length; i += EMBED_BATCH) {
     const batch = records.slice(i, i + EMBED_BATCH)
     onStage?.('embed')

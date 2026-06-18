@@ -32,6 +32,9 @@ export interface AppEnv {
 
 const RESOURCE_ID = 'web-user'
 const JSON_CT = { 'content-type': 'application/json; charset=utf-8' }
+// 单文件上限 100MB：整份 PDF 会读进内存（机器 2G），超限直接拒，别等 OOM。
+const MAX_PDF_MB = 100
+const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
 
 const json = (code: number, obj: unknown) =>
   new Response(JSON.stringify(obj), { status: code, headers: JSON_CT })
@@ -139,8 +142,13 @@ async function handleIngest(req: Request, env: AppEnv, url: URL): Promise<Respon
   } catch (err) {
     return json(400, { error: err instanceof Error ? err.message : String(err) })
   }
+  // Content-Length 预检：超限早拒，避免把超大上传整个读进内存。
+  const declared = Number(req.headers.get('content-length') || 0)
+  const tooBig = (n: number) => json(413, { error: `文件过大（${(n / 1048576).toFixed(1)}MB），上限 ${MAX_PDF_MB}MB` })
+  if (declared > MAX_PDF_BYTES) return tooBig(declared)
   const bytes = new Uint8Array(await req.arrayBuffer())
   if (bytes.byteLength === 0) return json(400, { error: '上传内容为空' })
+  if (bytes.byteLength > MAX_PDF_BYTES) return tooBig(bytes.byteLength) // 无 content-length 时的兜底
 
   const id = crypto.randomUUID()
   const r2Key = `pdf/${fileName}`

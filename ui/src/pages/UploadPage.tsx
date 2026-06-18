@@ -4,17 +4,31 @@ import { useIngest } from '../lib/useIngest'
 import { useLibraryContext } from '../lib/libraryContext'
 import { INGEST_STAGES } from '../lib/mockData'
 
+// 上传限制（与后端一致）：单文件 ≤100MB（整份进内存）、单批 ≤10 个。
+const MAX_MB = 100
+const MAX_BATCH = 10
+
 export function UploadPage() {
   const { refresh } = useLibraryContext()
   const { jobs, start, clear } = useIngest(refresh) // 入库完成后刷新侧栏资料库列表
   const [dragging, setDragging] = useState(false)
+  const [notice, setNotice] = useState('')
 
-  // 点击选择与拖入共用：收多个、只留 PDF，逐个排队串行入库。
+  // 点击选择与拖入共用：收多个、只留 PDF，挡掉超大/超量，逐个排队串行入库。
   const accept = (list?: FileList | null) => {
     if (!list?.length) return
-    const pdfs = Array.from(list).filter(
+    let pdfs = Array.from(list).filter(
       (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
     )
+    const msgs: string[] = []
+    const big = pdfs.filter((f) => f.size > MAX_MB * 1024 * 1024)
+    if (big.length) msgs.push(`超过 ${MAX_MB}MB 已跳过：${big.map((f) => f.name).join('、')}`)
+    pdfs = pdfs.filter((f) => f.size <= MAX_MB * 1024 * 1024)
+    if (pdfs.length > MAX_BATCH) {
+      msgs.push(`单批最多 ${MAX_BATCH} 个，仅取前 ${MAX_BATCH} 个`)
+      pdfs = pdfs.slice(0, MAX_BATCH)
+    }
+    setNotice(msgs.join('；'))
     if (pdfs.length) start(pdfs)
   }
 
@@ -35,6 +49,8 @@ export function UploadPage() {
           <span className="font-mono text-xs text-zinc-600">pdf/*.pdf → OCR → chunk → embed → upsert</span>
           <input type="file" accept="application/pdf" multiple className="hidden" onChange={(e) => { accept(e.target.files); e.target.value = '' }} />
         </label>
+        <p className="mt-2 text-xs text-zinc-600">单文件 ≤ {MAX_MB}MB，单批 ≤ {MAX_BATCH} 个</p>
+        {notice && <p className="mt-1 text-xs text-amber-400">{notice}</p>}
 
         {jobs.length > 0 && (
           <div className="mt-5 space-y-3">
